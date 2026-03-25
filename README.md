@@ -137,7 +137,7 @@ O projeto utiliza uma arquitetura híbrida, combinando dois modelos clássicos d
 - **Para a Botnet: P2P Não-Estruturado (*Unstructured Peer-to-Peer*):** A rede de bots não possui uma topologia rígida de roteamento (como uma *Distributed Hash Table - DHT*). Em vez disso, ela forma uma malha (*mesh*) onde cada nó conhece apenas um pequeno subconjunto de vizinhos aleatórios. Esse é o modelo perfeito para aplicar o *Gossip Protocol* (Protocolo de Fofoca), pois permite alta escalabilidade e resiliência sem a necessidade de manter uma estrutura complexa de endereçamento.
 - **Para o Comando e Controle (C2): Cluster com Consenso (Tolerância a Falhas):** O C2 deixou de ser um modelo centralizado cliente-servidor (ou *Master-Worker* simples) para se tornar um grupo de nós que utilizam um algoritmo de Eleição de Líder e troca de *Heartbeats* para manter o estado do sistema.
 
-1. **Arquitetura de SW interna**
+2. **Arquitetura de SW interna**
 
 Internamente, os scripts (especialmente o `bot.py` e o `c2.py`) utilizarão uma **Arquitetura Orientada a Eventos e baseada em Concorrência (Multithreading/Assíncrona)**.
 
@@ -146,14 +146,16 @@ Internamente, os scripts (especialmente o `bot.py` e o `c2.py`) utilizarão uma 
     - Outra *thread* cuidará do *Loop* de Sincronização (esperando o *timestamp* do ataque).
     - E múltiplas *threads* efêmeras serão criadas no momento exato do ataque para disparar os pacotes (HTTP/UDP/Slowloris) sem travar a escuta de novos comandos.
 - **No C2:** Teremos *threads* separadas para trocar pulsos de vida com os outros C2, para ler os comandos do operador e para realizar a telemetria do alvo.
-1. **Como o sistema será testado?**
+
+3. **Como o sistema será testado?**
 
 O sistema será testado de forma conteinerizada (usando o `podman-compose`), garantindo que a rede seja isolada e segura. Aplicaremos três tipos práticos de testes de Sistemas Distribuídos:
 
 - **Teste de Propagação (Integração):** Injetar um comando JSON no "Nó de Entrada" e verificar nos logs dos contêineres se a mensagem se propagou por todos os bots em tempo logarítmico, sem gerar *loops* infinitos (verificando o `msg_id`).
 - **Teste de Engenharia do Caos (*Chaos Engineering*):** Durante a execução pacífica da rede, o operador executará um `podman stop` no contêiner do C2 Líder. O teste será considerado um sucesso se os C2 Seguidores detectarem a queda e elegerem um novo Líder automaticamente em poucos segundos.
 - **Teste de Estresse/Carga (*Load Testing*):** Com a rede sincronizada, os bots farão o disparo unificado. O sucesso será medido pela telemetria do C2 registrando a degradação do `target.py` (tempo de resposta aumentando de milissegundos para *Timeout*).
-1. **Faz sentido usar algum tipo de middleware?**
+  
+4. **Faz sentido usar algum tipo de middleware?**
 
 **Neste contexto específico (Segurança Ofensiva / Red Team), NÃO faz sentido usar um *middleware* comercial tradicional (como RabbitMQ, Apache Kafka ou gRPC).**
 
