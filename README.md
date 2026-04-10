@@ -161,3 +161,38 @@ O sistema será testado de forma conteinerizada (usando o `podman-compose`), gar
 
 - **A Justificativa:** O projeto simula a infecção por malwares e a criação de uma *Botnet*. Em cenários reais, um malware precisa ser extremamente leve (alguns kilobytes), furtivo e rodar nativamente no sistema operacional da vítima. Exigir que um nó infectado instale um *broker* de mensagens pesado ou dependa de um servidor central de mensageria quebra o realismo do ataque e introduz um ponto único de falha.
 - **A Nossa Solução:** Em vez de usar um *middleware* de terceiros, **nós desenvolveremos o nosso próprio protocolo de comunicação na camada de aplicação**. Usaremos Sockets TCP puros (*raw sockets*) trafegando mensagens padronizadas em JSON. Isso garante a leveza de um malware real, mantendo a interoperabilidade e a abstração necessárias para o sistema distribuído funcionar.
+
+
+**5. Será necessário algum mecanismo de sincronização? (Relógio Real ou Relógio Lógico)**
+Sim. Utilizaremos Sincronização baseada em Relógios Reais (Physical Clocks).
+
+A Justificativa: Em sistemas distribuídos, usamos Relógios Lógicos (como os de Lamport) quando precisamos apenas garantir a ordem causal dos eventos (saber quem aconteceu antes de quem). Porém, no nosso ataque DDoS, a causalidade não importa. O que importa é o tempo absoluto. Queremos que todos os bots disparem o ataque no exato mesmo instante físico para gerar um pico massivo de tráfego.
+
+A Implementação: Usaremos o conceito de Barrier Synchronization (Barreira de Sincronização) acoplado a um Timestamp Unix no futuro (ex: execute_at: 1711384500). Isso pressupõe que as máquinas virtuais tenham seus relógios razoavelmente sincronizados pelo sistema operacional (via NTP), permitindo que a botnet, mesmo com o atraso da propagação da fofoca, espere o momento exato para agir de forma uníssona.
+
+**6. Será necessário empregar exclusão mútua (distribuída)? Qual algoritmo?**
+Não será necessário empregar algoritmos clássicos de Exclusão Mútua Distribuída (como o Algoritmo do Anel de Ficha ou o de Ricart-Agrawala).
+
+A Justificativa: A Exclusão Mútua é usada quando múltiplos nós competem para acessar um recurso compartilhado crítico que só pode ser modificado por um nó de cada vez (como escrever em um banco de dados financeiro). No nosso ecossistema:
+
+Na Botnet: Os bots não estão competindo por um recurso; pelo contrário, o objetivo do DDoS é exatamente gerar colisão e concorrência massiva contra a vítima.
+
+No C2: O problema de "quem tem o direito exclusivo de enviar comandos" é resolvido pela Eleição de Líder, o que elimina a necessidade de um lock (trava) distribuído nas operações cotidianas do controlador.
+
+**7. Será necessário um algoritmo de eleição? Qual?**
+Sim. Utilizaremos o Algoritmo de Eleição do Valentão (Bully Algorithm).
+
+A Justificativa e Implementação: O cluster C2 precisa de tolerância a falhas. O Bully Algorithm é ideal pela sua simplicidade e eficácia em grupos pequenos e de rede confiável (como a nossa infraestrutura Podman).
+
+Como funcionará: 1. Cada nó C2 terá um ID único (ex: C2-A=1, C2-B=2, C2-C=3). O nó de maior ID será o Líder inicial.
+2. Os Seguidores esperam um pulso de vida (Heartbeat) do Líder.
+3. Se o Líder "cair", o primeiro Seguidor a notar a falha inicia uma eleição enviando uma mensagem ELECTION para os nós com ID maior que o seu.
+4. Como não haverá resposta dos nós maiores (pois o antigo Líder caiu), este nó declara vitória enviando uma mensagem COORDINATOR para todos os nós menores, assumindo o papel de emissor oficial de ataques.
+
+
+**9. Se vai usar pub/sub, como será implementado?**
+O projeto NÃO usará o padrão tradicional de Publish/Subscribe (Pub/Sub) baseado em brokers ou tópicos.
+
+A Justificativa: Implementar um broker central (como RabbitMQ ou Kafka) ou um sistema de tópicos formal destruiria o realismo do nosso laboratório de Segurança Ofensiva, pois introduziria um ponto único de falha artificial que malwares reais não usam.
+
+A Nossa Solução (O "Pub/Sub" Descentralizado): No lugar do Pub/Sub tradicional, a propagação de mensagens será implementada através do Protocolo de Fofoca (Gossip Protocol). Ele atua como um sistema de mensageria epidêmico: o C2 (o "Publisher") publica a ordem em um único nó aleatório. Esse nó, de forma autônoma, atua como propagador, repassando a mensagem (semelhante ao ato de "publicar") aos seus vizinhos diretos, garantindo que toda a rede receba a informação sem depender de um barramento ou servidor central de mensagens.
