@@ -196,3 +196,72 @@ O projeto NÃO usará o padrão tradicional de Publish/Subscribe (Pub/Sub) basea
 A Justificativa: Implementar um broker central (como RabbitMQ ou Kafka) ou um sistema de tópicos formal destruiria o realismo do nosso laboratório de Segurança Ofensiva, pois introduziria um ponto único de falha artificial que malwares reais não usam.
 
 A Nossa Solução (O "Pub/Sub" Descentralizado): No lugar do Pub/Sub tradicional, a propagação de mensagens será implementada através do Protocolo de Fofoca (Gossip Protocol). Ele atua como um sistema de mensageria epidêmico: o C2 (o "Publisher") publica a ordem em um único nó aleatório. Esse nó, de forma autônoma, atua como propagador, repassando a mensagem (semelhante ao ato de "publicar") aos seus vizinhos diretos, garantindo que toda a rede receba a informação sem depender de um barramento ou servidor central de mensagens.
+
+
+**Mecanismo de sincronização de relógio**
+Precisaremos usar um relógio real. Disparar ataques no exato mesmo milissegundo . Barreira de sincronização baseada em relógio real, pois precisamos de um ataque coordenado.
+
+**Algoritmo deeleição faz sentido?**
+Sim, precisamos para o cluster C2, precisamos definir o líder talvez algoritmo de Bully seja o melhor. Implementar via sockets TCP/UDP. Nó com maior IP ganha
+
+**Pub: O C2 injeta a mensagem
+Sub: todos os bots que assinam o canal de ataque para receber e propagar a fofoca**
+Sockets TCP com payloads em JSON
+
+**Quais recursos precisam ser nomeados/identificados?**
+-Bots
+-Sockets
+-Nós do Cluster C2
+-Mensagem do Gossip
+
+**Quais esquemas de nomeação**
+-Estruturado: hierarquia IP+Portal ou identificação por sub-rede
+-Por Atributos: Indentificação dos bots como ímpar ou par
+
+**Dados o esquema, qual mecanismo de resolução? Dê nomes**
+- Estruturado: roteamento baseado em IP
+- Atributos: seleção de bots baseada em caracterísiticas
+
+**Processos**
+**- Faz sentido usar threads**
+Sim, cada nó oprecisa utilizar multithreads
+
+**- Servidores stateful ou staless**
+Ambos:
+- Stateless: Alvo(target.py): simulando como uma API que processa cada requisito
+                              ataques volumétricos: Bots enviando pacotes UDP/HTTP flood não precisam manter estado.
+- Stateful: Bot(P2P) Precisa lembrar de mensagens já recebidas, para não ter loops infinitos na rede de fofoca
+                     Cluster C2: os nós precisam saber quem é o líder atual e monitorar a saúde dos membros via heartbeats
+                     Ataque slowload: manteremos conexões abertas para exaurir recursos do ser
+
+**- Faz sentido usar técnicas de virtualização**
+Sim, e faremos com Podman por três motivos:
+        - Isolamento de rede
+        - Estabilidade (podemos subir com mais facildiade usando Podman Compose)
+        - Fidelidade (para atribuir IPs estáticos eespecíficos em cada nó)
+
+Parte de consistência e replicação:
+O que vai ser replicado?
+Se a replicação será por motivos de desempenho ou tolerância a falhas?
+Qual o modelo de consistência e o porquê dessa escolha?
+Qual o protocolo que vai  ser utilizado para implementar?
+Tolerância a falhas
+Quais tipos de falhas você deseja tolerar?
+Qual a abordagem para detectar as falhas?
+Quantas falhas (nos, processos) você deseja tolerar?
+Qual protocolo de tolerância a falhas?
+Quais as consequências do teorema CAP?
+Como recuperar das falhas?
+ **Disponibilidade**
+ Quais tipos de falha deseja-se tolerar? (crash, omissão, temporal, respeito, bizantino)
+ \rightarrow Temporal, omissão e crash
+ Quantos processos falhantes serão suportados?
+ \rightarrow 2 processos
+ Qual estratégia para detectar falhas?
+ \rightarrow Load Balancer / Proxy
+ Qual protocolo utilizar?
+ HTTP, Raft, TCP SIN Flood
+ Quais as consequencias do Teorema CAP p/ o projeto
+ A P (tolerância a partições) é obrigatório, vamos usar um sistema AP que usa um Load Balancer distribuindo carga para nós independentes
+ Como recuperar as falhas?
+ \rightarrow Orquestração através do Load Balancer aplica uma ejection. Reinicialização automática
