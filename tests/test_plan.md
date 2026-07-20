@@ -22,7 +22,7 @@ podman logs -f c2-a   # observe a eleição inicial do líder
 # http://localhost:8090
 
 # dispara um teste de carga contra o LB (10.20.0.10:8080), daqui a 10s, por 15s
-python3 scripts/operator_client.py <ip_de_um_c2>:9002 10.20.0.10 80 10 15
+python3 scripts/operator_client.py <ip_de_um_c2>:9002 10.20.0.10 8080 10 15
 
 # em outro terminal, durante o teste:
 ./scripts/chaos.sh kill-target 1

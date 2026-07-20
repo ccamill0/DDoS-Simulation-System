@@ -139,7 +139,7 @@ def process(msg: dict):
         run_stub_vector(vetor, target, port, duration)
 
 
-def run_http_flood(target: str, port: int, duration: float, workers: int = 20):
+def run_http_flood(target: str, port: int, duration: float, workers: int = 100):
     """Gera carga real via requisições HTTP GET concorrentes e válidas.
     Equivalente em técnica a ferramentas padrão de load-testing."""
     url = f"http://{target}:{port}/"

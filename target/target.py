@@ -73,10 +73,8 @@ async def anti_entropy_loop():
                 resp = await client.post(f"http://{peer}/metrics/sync", json=payload)
                 if resp.status_code == 200:
                     await counter.merge(resp.json())
-            except (httpx.ConnectError, httpx.TimeoutException, httpx.ReadError):
-                # Peer indisponível (crash/omissão/temporal) — consistente com o
-                # modelo de falhas do projeto; simplesmente tenta de novo depois.
-                pass
+            except Exception as e:  # <-- SUBSTITUIR
+                print(f"[{REPLICA_ID}] anti-entropia: erro {e}")
 
 
 @asynccontextmanager

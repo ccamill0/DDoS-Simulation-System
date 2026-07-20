@@ -98,10 +98,11 @@ async def poll_targets(client: httpx.AsyncClient, lb_states: dict):
         entry = {"name": name, "lb_state": lb_states.get(name, "?")}
 
         try:
+            t0 = time.perf_counter()
             r = await client.get(f"http://{host}:{port}/health", timeout=1.5)
+            entry["latency_ms"] = round((time.perf_counter() - t0) * 1000, 2)
             h = r.json()
             entry["reachable"] = True
-            entry["latency_ms"] = h.get("latency_ms")
             entry["requests_served"] = h.get("requests_served")
         except httpx.HTTPError:
             entry["reachable"] = False
