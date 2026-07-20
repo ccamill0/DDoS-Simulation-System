@@ -73,7 +73,7 @@ async def anti_entropy_loop():
                 resp = await client.post(f"http://{peer}/metrics/sync", json=payload)
                 if resp.status_code == 200:
                     await counter.merge(resp.json())
-            except Exception as e:  # <-- SUBSTITUIR
+            except Exception as e:  
                 print(f"[{REPLICA_ID}] anti-entropia: erro {e}")
 
 
