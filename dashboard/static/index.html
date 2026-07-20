@@ -1,0 +1,504 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Observabilidade — Laboratório DDoS</title>
+<style>
+  :root {
+    --bg: #12161c;
+    --panel: #1b212b;
+    --line: #2a323f;
+    --text: #e4e8ee;
+    --muted: #7c8798;
+    --ok: #4fd1ae;
+    --down: #e8735c;
+    --leader: #e8b04b;
+    --series-2: #e8b04b;
+    --series-3: #7aa2e8;
+    --mono: ui-monospace, "SFMono-Regular", "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+    --sans: ui-sans-serif, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .page {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 28px 24px 60px;
+  }
+
+  header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 22px;
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 18px;
+  }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 0 6px;
+  }
+
+  h1 {
+    font-size: 22px;
+    margin: 0;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  .status-strip {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .conn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .conn-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--muted);
+    transition: background 0.3s ease;
+  }
+
+  .cap-pill {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--ok);
+    border: 1px solid var(--ok);
+    padding: 3px 8px;
+    border-radius: 3px;
+    letter-spacing: 0.04em;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: 1.7fr 1fr;
+    gap: 20px;
+  }
+
+  @media (max-width: 860px) {
+    .grid { grid-template-columns: 1fr; }
+  }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 18px 18px 20px;
+    margin-bottom: 20px;
+  }
+
+  .panel-title {
+    font-family: var(--mono);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    margin: 0 0 14px;
+  }
+
+  .replica-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+  }
+
+  @media (max-width: 620px) {
+    .replica-row { grid-template-columns: 1fr; }
+  }
+
+  .replica-card {
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    padding: 12px;
+    background: #161b23;
+  }
+
+  .replica-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+
+  .replica-name {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  .dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .dot.ok { background: var(--ok); box-shadow: 0 0 0 3px rgba(79,209,174,0.15); }
+  .dot.down { background: var(--down); box-shadow: 0 0 0 3px rgba(232,115,92,0.15); }
+  .dot.unknown { background: var(--muted); }
+
+  .replica-metrics {
+    display: flex;
+    justify-content: space-between;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+
+  .replica-metrics strong {
+    color: var(--text);
+    font-weight: 500;
+  }
+
+  .sparkline {
+    width: 100%;
+    height: 36px;
+    display: block;
+  }
+
+  .counter-bars {
+    margin-top: 10px;
+  }
+
+  .counter-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--muted);
+    margin-bottom: 3px;
+  }
+
+  .counter-track {
+    flex: 1;
+    height: 5px;
+    background: #10141a;
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .counter-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--ok), var(--series-3));
+    border-radius: 3px;
+  }
+
+  .counter-val {
+    font-variant-numeric: tabular-nums;
+    width: 46px;
+    text-align: right;
+  }
+
+  .c2-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .c2-chip {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    padding: 9px 12px;
+    background: #161b23;
+  }
+
+  .c2-chip.leader {
+    border-color: var(--leader);
+    background: rgba(232, 176, 75, 0.08);
+  }
+
+  .c2-chip.unreachable {
+    opacity: 0.5;
+    border-style: dashed;
+  }
+
+  .c2-id {
+    font-family: var(--mono);
+    font-size: 12px;
+  }
+
+  .c2-role {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    padding: 2px 7px;
+    border-radius: 3px;
+    color: var(--muted);
+    border: 1px solid var(--line);
+  }
+
+  .c2-role.leader {
+    color: var(--leader);
+    border-color: var(--leader);
+  }
+
+  .timeline {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    max-height: 420px;
+    overflow-y: auto;
+  }
+
+  .timeline-item {
+    display: flex;
+    gap: 10px;
+    padding: 9px 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .timeline-item:last-child { border-bottom: none; }
+
+  .timeline-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-top: 4px;
+    flex-shrink: 0;
+  }
+  .timeline-dot.ejection { background: var(--down); }
+  .timeline-dot.readmission { background: var(--ok); }
+  .timeline-dot.election { background: var(--leader); }
+
+  .timeline-body { flex: 1; }
+
+  .timeline-msg {
+    font-size: 13px;
+    line-height: 1.4;
+  }
+
+  .timeline-time {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+
+  .empty-note {
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+
+  footer {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    text-align: center;
+    margin-top: 8px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .conn-dot { transition: none; }
+  }
+</style>
+</head>
+<body>
+  <div class="page">
+    <header>
+      <div>
+        <p class="eyebrow">Sistemas Distribuídos · Laboratório</p>
+        <h1>Observabilidade — Ataque Coordenado × Defesa Resiliente</h1>
+      </div>
+      <div class="status-strip">
+        <span class="cap-pill">AP · plano de dados</span>
+        <span class="conn"><span class="conn-dot" id="conn-dot"></span> atualizado <span id="last-update">—</span></span>
+      </div>
+    </header>
+
+    <div class="grid">
+      <div>
+        <div class="panel">
+          <p class="panel-title">Réplicas do alvo</p>
+          <div class="replica-row" id="replica-row"></div>
+        </div>
+      </div>
+
+      <div>
+        <div class="panel">
+          <p class="panel-title">Cluster C2</p>
+          <div class="c2-list" id="c2-list"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <p class="panel-title">Linha do tempo de eventos</p>
+      <div class="timeline" id="timeline"></div>
+    </div>
+
+    <footer>Polling HTTP a cada ~1s · sem dependências externas · dashboard.py</footer>
+  </div>
+
+<script>
+  const REPLICA_ROW = document.getElementById('replica-row');
+  const C2_LIST = document.getElementById('c2-list');
+  const TIMELINE = document.getElementById('timeline');
+  const LAST_UPDATE = document.getElementById('last-update');
+  const CONN_DOT = document.getElementById('conn-dot');
+
+  function timeAgo(ts) {
+    if (!ts) return '—';
+    const s = Math.max(0, Math.round(Date.now() / 1000 - ts));
+    if (s < 5) return 'agora';
+    if (s < 60) return `há ${s}s`;
+    return `há ${Math.round(s / 60)}min`;
+  }
+
+  function clockTime(ts) {
+    if (!ts) return '';
+    const d = new Date(ts * 1000);
+    return d.toLocaleTimeString('pt-BR', { hour12: false });
+  }
+
+  function sparklinePoints(history) {
+    const pts = (history || []).filter(p => p.latency_ms !== null && p.latency_ms !== undefined);
+    if (pts.length < 2) return null;
+    const w = 200, h = 36, pad = 3;
+    const max = Math.max(...pts.map(p => p.latency_ms), 20);
+    const stepX = (w - pad * 2) / (pts.length - 1);
+    return pts
+      .map((p, i) => {
+        const x = pad + i * stepX;
+        const y = h - pad - (p.latency_ms / max) * (h - pad * 2);
+        return `${x.toFixed(1)},${y.toFixed(1)}`;
+      })
+      .join(' ');
+  }
+
+  function renderReplicas(targets, history) {
+    const names = Object.keys(targets).sort();
+    if (names.length === 0) {
+      REPLICA_ROW.innerHTML = '<p class="empty-note">Aguardando dados das réplicas...</p>';
+      return;
+    }
+
+    REPLICA_ROW.innerHTML = names.map(name => {
+      const t = targets[name];
+      const dotClass = !t.reachable ? 'down' : (t.lb_state === 'DOWN' ? 'down' : (t.lb_state === 'UP' ? 'ok' : 'unknown'));
+      const points = sparklinePoints(history[name]);
+      const sparkline = points
+        ? `<svg class="sparkline" viewBox="0 0 200 36" preserveAspectRatio="none">
+             <polyline points="${points}" fill="none" stroke="var(--ok)" stroke-width="2" />
+           </svg>`
+        : '<div class="sparkline"></div>';
+
+      const counts = t.counts || {};
+      const countKeys = Object.keys(counts).sort();
+      const maxCount = Math.max(...countKeys.map(k => counts[k]), 1);
+      const bars = countKeys.map(k => `
+        <div class="counter-row">
+          <span style="width:52px">${k}</span>
+          <div class="counter-track"><div class="counter-fill" style="width:${(counts[k] / maxCount * 100).toFixed(0)}%"></div></div>
+          <span class="counter-val">${counts[k]}</span>
+        </div>
+      `).join('');
+
+      return `
+        <div class="replica-card">
+          <div class="replica-head">
+            <span class="replica-name">${name}</span>
+            <span class="dot ${dotClass}"></span>
+          </div>
+          <div class="replica-metrics">
+            <span>latência <strong>${t.latency_ms !== null && t.latency_ms !== undefined ? t.latency_ms + 'ms' : '—'}</strong></span>
+            <span>pool <strong>${t.lb_state || '—'}</strong></span>
+          </div>
+          ${sparkline}
+          <div class="counter-bars">${bars || '<span class="empty-note">sem dados de contador ainda</span>'}</div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  function renderC2(c2) {
+    const ids = Object.keys(c2).sort((a, b) => a - b);
+    if (ids.length === 0) {
+      C2_LIST.innerHTML = '<p class="empty-note">Aguardando dados do cluster C2...</p>';
+      return;
+    }
+    C2_LIST.innerHTML = ids.map(id => {
+      const n = c2[id];
+      const isLeader = n.role === 'LEADER';
+      const chipClasses = ['c2-chip'];
+      if (isLeader) chipClasses.push('leader');
+      if (!n.reachable) chipClasses.push('unreachable');
+      return `
+        <div class="${chipClasses.join(' ')}">
+          <span class="c2-id">c2-${id}</span>
+          <span class="c2-role ${isLeader ? 'leader' : ''}">${n.reachable ? (n.role || '—') : 'sem resposta'}</span>
+        </div>
+      `;
+    }).join('');
+  }
+
+  function renderTimeline(events) {
+    if (!events || events.length === 0) {
+      TIMELINE.innerHTML = `<p class="empty-note">Nenhum evento ainda — derrube uma réplica
+        (<code>./scripts/chaos.sh kill-target 1</code>) ou dispare um LOADTEST para ver a
+        linha do tempo ganhar vida.</p>`;
+      return;
+    }
+    TIMELINE.innerHTML = events.map(ev => `
+      <div class="timeline-item">
+        <span class="timeline-dot ${ev.kind}"></span>
+        <div class="timeline-body">
+          <div class="timeline-msg">${ev.message}</div>
+          <div class="timeline-time">${clockTime(ev.ts)} · ${timeAgo(ev.ts)}</div>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  async function tick() {
+    try {
+      const res = await fetch('/api/state', { cache: 'no-store' });
+      if (!res.ok) throw new Error('resposta ruim');
+      const data = await res.json();
+      renderReplicas(data.targets || {}, data.history || {});
+      renderC2(data.c2 || {});
+      renderTimeline(data.events || []);
+      LAST_UPDATE.textContent = timeAgo(data.last_update);
+      CONN_DOT.style.background = 'var(--ok)';
+    } catch (e) {
+      CONN_DOT.style.background = 'var(--down)';
+    }
+  }
+
+  tick();
+  setInterval(tick, 1000);
+</script>
+</body>
+</html>

@@ -1,0 +1,173 @@
+version: "3.8"
+
+# Rede isolada, sem rota para fora (RNF-05). "internal: true" impede
+# qualquer tráfego de saída para a internet ou para a rede física do host.
+networks:
+  labnet:
+    driver: bridge
+    internal: true
+    ipam:
+      config:
+        - subnet: 10.20.0.0/24
+
+services:
+  # ---------------------------------------------------------- defensivo --
+  lb:
+    image: haproxy:2.9
+    networks:
+      labnet:
+        ipv4_address: 10.20.0.10
+    volumes:
+      - ./lb/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+    depends_on: [target-1, target-2, target-3]
+    # Observação: com a rede marcada como internal, portas publicadas podem
+    # não ser alcançáveis do host em todos os runtimes. Para depurar do host,
+    # use `podman exec -it lb sh` ou remova temporariamente `internal: true`.
+    ports:
+      - "8080:8080"
+      - "8404:8404"
+
+  target-1:
+    build: ./target
+    environment:
+      REPLICA_ID: target-1
+      PEERS: "10.20.0.12:8000,10.20.0.13:8000"
+    networks:
+      labnet:
+        ipv4_address: 10.20.0.11
+    restart: on-failure
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 5s
+      retries: 3
+
+  target-2:
+    build: ./target
+    environment:
+      REPLICA_ID: target-2
+      PEERS: "10.20.0.11:8000,10.20.0.13:8000"
+    networks:
+      labnet:
+        ipv4_address: 10.20.0.12
+    restart: on-failure
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 5s
+      retries: 3
+
+  target-3:
+    build: ./target
+    environment:
+      REPLICA_ID: target-3
+      PEERS: "10.20.0.11:8000,10.20.0.12:8000"
+    networks:
+      labnet:
+        ipv4_address: 10.20.0.13
+    restart: on-failure
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 5s
+      retries: 3
+
+  # ---------------------------------------------------------- ofensivo --
+  c2-a:
+    build: ./c2
+    environment:
+      NODE_ID: 1
+      PEERS: "2:10.20.0.22,3:10.20.0.23"
+      BOTS: "10.20.0.31:7000,10.20.0.32:7000,10.20.0.33:7000,10.20.0.34:7000,10.20.0.35:7000"
+      LB_HEALTH_URL: "http://10.20.0.10:8080/health"
+    networks:
+      labnet:
+        ipv4_address: 10.20.0.21
+    restart: on-failure
+
+  c2-b:
+    build: ./c2
+    environment:
+      NODE_ID: 2
+      PEERS: "1:10.20.0.21,3:10.20.0.23"
+      BOTS: "10.20.0.31:7000,10.20.0.32:7000,10.20.0.33:7000,10.20.0.34:7000,10.20.0.35:7000"
+      LB_HEALTH_URL: "http://10.20.0.10:8080/health"
+    networks:
+      labnet:
+        ipv4_address: 10.20.0.22
+    restart: on-failure
+
+  c2-c:
+    build: ./c2
+    environment:
+      NODE_ID: 3
+      PEERS: "1:10.20.0.21,2:10.20.0.22"
+      BOTS: "10.20.0.31:7000,10.20.0.32:7000,10.20.0.33:7000,10.20.0.34:7000,10.20.0.35:7000"
+      LB_HEALTH_URL: "http://10.20.0.10:8080/health"
+    networks:
+      labnet:
+        ipv4_address: 10.20.0.23
+    restart: on-failure
+
+  bot-1:
+    build: ./bot
+    environment:
+      MY_ID: bot-1
+      NEIGHBORS: "10.20.0.32:7000,10.20.0.33:7000"
+    networks:
+      labnet:
+        ipv4_address: 10.20.0.31
+    restart: on-failure
+
+  bot-2:
+    build: ./bot
+    environment:
+      MY_ID: bot-2
+      NEIGHBORS: "10.20.0.31:7000,10.20.0.33:7000,10.20.0.34:7000"
+    networks:
+      labnet:
+        ipv4_address: 10.20.0.32
+    restart: on-failure
+
+  bot-3:
+    build: ./bot
+    environment:
+      MY_ID: bot-3
+      NEIGHBORS: "10.20.0.31:7000,10.20.0.32:7000,10.20.0.34:7000,10.20.0.35:7000"
+    networks:
+      labnet:
+        ipv4_address: 10.20.0.33
+    restart: on-failure
+
+  bot-4:
+    build: ./bot
+    environment:
+      MY_ID: bot-4
+      NEIGHBORS: "10.20.0.32:7000,10.20.0.33:7000,10.20.0.35:7000"
+    networks:
+      labnet:
+        ipv4_address: 10.20.0.34
+    restart: on-failure
+
+  bot-5:
+    build: ./bot
+    environment:
+      MY_ID: bot-5
+      NEIGHBORS: "10.20.0.33:7000,10.20.0.34:7000"
+    networks:
+      labnet:
+        ipv4_address: 10.20.0.35
+    restart: on-failure
+
+  # ------------------------------------------------------ observabilidade --
+  dashboard:
+    build: ./dashboard
+    environment:
+      TARGETS: "target-1:10.20.0.11:8000,target-2:10.20.0.12:8000,target-3:10.20.0.13:8000"
+      C2_NODES: "1:10.20.0.21,2:10.20.0.22,3:10.20.0.23"
+      LB_STATS_URL: "http://10.20.0.10:8404/stats;csv"
+      POLL_INTERVAL: "1.0"
+    networks:
+      labnet:
+        ipv4_address: 10.20.0.40
+    depends_on: [lb, c2-a, c2-b, c2-c]
+    restart: on-failure
+    ports:
+      - "8090:8090"
